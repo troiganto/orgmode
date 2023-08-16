@@ -2,6 +2,20 @@ local Files = require('orgmode.parser.files')
 local utils = require('orgmode.utils')
 local Hyperlinks = {}
 
+---@class FindTargetContext Arguments for `find_matching_links()`.
+---@field base? string The thing to look up, meaning depends on function
+---@field line? string The full line with the link, may contain garbage before
+---@field hyperlinks? SearchOptions do not set manually, added by `update_hyperlink_ctx()`
+---@field skip_add_prefix? boolean if `true`, find full `Section` objects, otherwise completion strings
+
+---@class SearchOptions Result of parsing a string
+---@field filepath boolean|string if the link specifies a file, the resolved path to it; `false` otherwise
+---@field headline boolean|string the headline to look up if the link specifies one; `false` otherwise
+---@field custom_id boolean|string the CUSTOM_ID to look up if the link specifies one; `false` otherwise
+
+---Find the file give by the `ctx.hyperlinks.filepath` or the current file.
+---@param ctx FindTargetContext with SearchOptions set
+---@return File
 local function get_file_from_context(ctx)
   local filepath = (ctx.hyperlinks and ctx.hyperlinks.filepath)
   if not filepath then
@@ -15,6 +29,11 @@ local function get_file_from_context(ctx)
   return Files.get(canonical)
 end
 
+---Add `hyperlinks` to the given context and modify `ctx.base`.
+---If the link points at a specific headline or CUSTOM_ID, `ctx.base` is changed to that headline or CUSTOM_ID.
+---The file path, if one was given, is moved to `ctx.hyperlinks.filepath`.
+---@param ctx FindTargetContext
+---@return nil
 local function update_hyperlink_ctx(ctx)
   if not ctx.line then
     return
@@ -50,6 +69,10 @@ local function update_hyperlink_ctx(ctx)
   ctx.hyperlinks = hyperlinks_ctx
 end
 
+---Assume `ctx.base` points at a file and look up all matching org files.
+---Only ever returns string paths, not sections. Do not call when `skip_add_prefix` is true.
+---@param ctx FindTargetContext
+---@return string[]
 function Hyperlinks.find_by_filepath(ctx)
   local filenames = Files.filenames()
   local file_base = ctx.base:gsub('^file:', '')
@@ -77,6 +100,9 @@ function Hyperlinks.find_by_filepath(ctx)
   end, valid_filenames)
 end
 
+---Find headlines whose CUSTOM_ID matches `ctx.base` without the leading "#".
+---@param ctx FindTargetContext
+---@return Section[]|string[] @type depends on `ctx.skip_add_prefix`
 function Hyperlinks.find_by_custom_id_property(ctx)
   local file = get_file_from_context(ctx)
   local headlines = file:find_headlines_with_property_matching('CUSTOM_ID', ctx.base:sub(2))
@@ -88,6 +114,9 @@ function Hyperlinks.find_by_custom_id_property(ctx)
   end, headlines)
 end
 
+---Find headlines whose title matches `ctx.base` without the leading "*".
+---@param ctx FindTargetContext
+---@return Section[]|string[] @type depends on `ctx.skip_add_prefix`
 function Hyperlinks.find_by_title_pointer(ctx)
   local file = get_file_from_context(ctx)
   local headlines = file:find_headlines_by_title(ctx.base:sub(2), false)
@@ -99,6 +128,9 @@ function Hyperlinks.find_by_title_pointer(ctx)
   end, headlines)
 end
 
+---Find headlines whose section contains the <<link target>> `ctx.base`.
+---@param ctx FindTargetContext
+---@return Section[]|string[] @type depends on `ctx.skip_add_prefix`
 function Hyperlinks.find_by_dedicated_target(ctx)
   if not ctx.base or ctx.base == '' then
     return {}
@@ -122,6 +154,9 @@ function Hyperlinks.find_by_dedicated_target(ctx)
   return targets
 end
 
+---Find headlines whose title starts with `ctx.base` in the current file.
+---@param ctx FindTargetContext
+---@return Section[]|string[] @type depends on `ctx.skip_add_prefix`
 function Hyperlinks.find_by_title(ctx)
   if not ctx.base or ctx.base == '' then
     return {}
@@ -135,6 +170,8 @@ function Hyperlinks.find_by_title(ctx)
   end, headlines)
 end
 
+---@param ctx? FindTargetContext
+---@return Section[]|string[] @type depends on `ctx.skip_add_prefix`
 function Hyperlinks.find_matching_links(ctx)
   ctx = ctx or {}
   ctx.base = ctx.base and vim.trim(ctx.base) or nil
@@ -158,11 +195,15 @@ function Hyperlinks.find_matching_links(ctx)
   return all
 end
 
+---Resolve the given path relative to the current file's path.
+---If the path begins with the protocol "file:", it is stripped.
+---@param url_path string
+---@return string
 function Hyperlinks.get_file_real_path(url_path)
   local path = url_path
   path = path:gsub('^file:', '')
   if path:match('^~/') then
-    path = path:gsub('^~', os.getenv('HOME'))
+    path = path:gsub('^~', vim.loop.os_homedir())
   end
   if path:match('^/') then
     return path
