@@ -3,6 +3,15 @@
 ---@field org_agenda_span 'day' | 'week' | 'month' | 'year' | number
 ---@field org_log_repeat 'time' | 'note' | false
 ---@field calendar { round_min_with_hours: boolean, min_big_step: number, min_small_step: number? }
+---@field org_attach_preferred_new_method 'id' | 'dir' | 'ask' | false
+---@field org_attach_method 'mv' | 'cp' | 'ln' | 'lns'
+---@field org_attach_use_inheritance true | false | 'selective'
+---@field org_attach_store_link_p true | false | 'file' | 'attached'
+---@field org_attach_archive_delete true | false | 'query'
+---@field org_attach_id_to_path_function_list (function|string)[]
+---@field org_attach_after_change_hook function?
+---@field org_attach_open_hook function?
+---@field org_attach_sync_delete_empty_dir true | false | 'query'
 local DefaultConfig = {
   org_agenda_files = '',
   org_default_notes_file = '',
@@ -11,7 +20,7 @@ local DefaultConfig = {
   org_todo_keyword_faces = {},
   org_deadline_warning_days = 14,
   org_agenda_min_height = 16,
-  org_agenda_span = 'week', -- day/week/month/year/number of days
+  org_agenda_span = 'week',   -- day/week/month/year/number of days
   org_agenda_start_on_weekday = 1,
   org_agenda_start_day = nil, -- start from today + this modifier
   calendar_week_start_day = 1,
@@ -65,6 +74,76 @@ local DefaultConfig = {
     [':tangle'] = 'no',
     [':noweb'] = 'no',
   },
+  org_attach_id_dir = './data/', --[[The directory where attachments are stored. If this is a relative path, it will be interpreted relative to the directory where the Org file lives.]]
+  org_attach_dir_relative = false, --[[True means directories in DIR property are added as relative links. Defaults to absolute location.]]
+  org_attach_auto_tag = 'ATTACH', --[[Tag that will be triggered automatically when an entry has an attachment.]]
+  org_attach_preferred_new_method = 'id', --[[Preferred way to attach to nodes without existing ID and DIR property.
+  This choice is used when adding attachments to nodes without ID
+  and DIR properties.
+
+  Allowed values are:
+
+  id         Create and use an ID parameter
+  dir        Create and use a DIR parameter
+  ask        Ask the user for input of which method to choose
+  false      Prefer to not create a new parameter
+
+             false means that ID or DIR has to be created explicitly
+             before attaching files.]]
+  org_attach_method = 'cp', --[[The preferred method to attach a file.
+  Allowed values are:
+
+  mv    rename the file to move it into the attachment directory
+  cp    copy the file
+  ln    create a hard link.  Note that this is not supported
+        on all systems, and then the result is not defined.
+  lns   create a symbol link.  Note that this is not supported
+        on all systems, and then the result is not defined.]]
+  org_attach_expert = false, --[[True means do not show the splash buffer with the attach dispatcher.]]
+  org_attach_use_inheritance = 'selective', --[[Attachment inheritance for the outline.
+
+  Enabling inheritance for `org-attach' implies two things.  First,
+  that attachment links will look through all parent headings until
+  it finds the linked attachment.  Second, that running `org-attach'
+  inside a node without attachments will make `org-attach' operate on
+  the first parent heading it finds with an attachment.
+
+  Selective means to respect the inheritance setting in
+  `org-use-property-inheritance'."
+  True means to inherit attachments. False means not to inherit them.
+  ]]
+  org_attach_store_link_p = 'attached', --[[A truthy value means store a link to a file when attaching it.
+
+  When true, store the link to original file location.
+  When 'file', store file link to the attach-dir location.
+  When 'attached', store attachment link to the attach-dir location.]]
+  org_attach_archive_delete = false, --[[True means attachments are deleted upon archiving a subtree.
+  When set to 'query', ask the user instead.]]
+  org_attach_id_to_path_function_list = {
+    'uuid-folder-format', 'ts-folder-format', 'fallback-folder-format',
+  }, --[[List of functions used to derive attachment path from an ID string.
+  The functions are called with a single ID argument until the return
+  value is an existing folder.  If no folder has been created yet for
+  the given ID, then the first truthy value defines the attachment
+  dir to be created.
+
+  Usually, the ID format passed to the functions is defined by
+  `org_id_method`.  It is advised that the first function in the list do
+  not generate all the attachment dirs inside the same parent dir.  Some
+  file systems may have performance issues in such scenario.
+
+  Care should be taken when customizing this variable.  Previously
+  created attachment folders might not be correctly mapped upon removing
+  functions from the list.  Then, Org will not be able to detect the
+  existing attachments.]]
+  org_attach_after_change_hook = nil, --[[Hook called when files have been added or removed to the attachment folder.]]
+  org_attach_open_hook = nil, --[[Hook that is invoked by `org-attach-open'.
+
+  Created mostly to be compatible with org-attach-git after removing
+  git-functionality from this file.]]
+  org_attach_sync_delete_empty_dir = 'query', --[[Determine what to do with an empty attachment directory on sync.
+  When set to false, don't touch the directory.  When set to 'query',
+  ask the user instead, else remove without asking.]]
   win_split_mode = 'horizontal',
   win_border = 'single',
   notifications = {
@@ -153,10 +232,10 @@ local DefaultConfig = {
       org_do_demote = '>>',
       org_promote_subtree = '<s',
       org_demote_subtree = '>s',
-      org_meta_return = '<Leader><CR>', -- Add heading, item or row (context-dependent)
+      org_meta_return = '<Leader><CR>',                       -- Add heading, item or row (context-dependent)
       org_return = '<CR>',
-      org_insert_heading_respect_content = '<prefix>ih', -- Add new heading after current heading block (same level)
-      org_insert_todo_heading = '<prefix>iT', -- Add new todo heading right after current heading (same level)
+      org_insert_heading_respect_content = '<prefix>ih',      -- Add new heading after current heading block (same level)
+      org_insert_todo_heading = '<prefix>iT',                 -- Add new todo heading right after current heading (same level)
       org_insert_todo_heading_respect_content = '<prefix>it', -- Add new todo heading after current heading block (same level)
       org_move_subtree_up = '<prefix>K',
       org_move_subtree_down = '<prefix>J',
@@ -180,6 +259,7 @@ local DefaultConfig = {
       org_set_effort = '<prefix>xe',
       org_show_help = 'g?',
       org_babel_tangle = '<prefix>bt',
+      org_attach = '<prefix><C-A>',
     },
     edit_src = {
       org_edit_src_abort = '<prefix>k',
