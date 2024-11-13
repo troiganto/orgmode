@@ -55,7 +55,7 @@ end
 
 ---@private
 ---@param link string
----@return string
+---@return string | nil
 function OrgLinkId:_parse(link)
   return link:match('^id:(.+)$')
 end

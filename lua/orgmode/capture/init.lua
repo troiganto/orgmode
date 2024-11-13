@@ -3,6 +3,8 @@ local fs = require('orgmode.utils.fs')
 local config = require('orgmode.config')
 local Templates = require('orgmode.capture.templates')
 local Template = require('orgmode.capture.template')
+local EventManager = require('orgmode.events')
+local HeadlineArchivedEvent = require('orgmode.events.types.headline_archived_event')
 local Menu = require('orgmode.ui.menu')
 local Range = require('orgmode.files.elements.range')
 local CaptureWindow = require('orgmode.capture.window')
@@ -47,24 +49,24 @@ function Capture:setup_mappings()
   end
   local capture_map = maps.org_capture_finalize
   capture_map.map_entry
-    :with_handler(function()
-      return self:refile()
-    end)
-    :attach(capture_map.default_map, capture_map.user_map, capture_map.opts)
+      :with_handler(function()
+        return self:refile()
+      end)
+      :attach(capture_map.default_map, capture_map.user_map, capture_map.opts)
 
   local refile_map = maps.org_capture_refile
   refile_map.map_entry
-    :with_handler(function()
-      return self:refile_to_destination()
-    end)
-    :attach(refile_map.default_map, refile_map.user_map, refile_map.opts)
+      :with_handler(function()
+        return self:refile_to_destination()
+      end)
+      :attach(refile_map.default_map, refile_map.user_map, refile_map.opts)
 
   local kill_map = maps.org_capture_kill
   kill_map.map_entry
-    :with_handler(function()
-      return self:kill(true)
-    end)
-    :attach(kill_map.default_map, kill_map.user_map, kill_map.opts)
+      :with_handler(function()
+        return self:kill(true)
+      end)
+      :attach(kill_map.default_map, kill_map.user_map, kill_map.opts)
 end
 
 ---@param template OrgCaptureTemplate
@@ -100,7 +102,7 @@ function Capture:on_refile_close()
   end
   if is_modified then
     local choice =
-      vim.fn.confirm(string.format('Do you want to refile this to %s?', opts.destination_file.filename), '&Yes\n&No')
+        vim.fn.confirm(string.format('Do you want to refile this to %s?', opts.destination_file.filename), '&Yes\n&No')
     vim.cmd([[redraw!]])
     if choice ~= 1 then
       if self.on_cancel_refile then
@@ -277,7 +279,7 @@ function Capture:refile_file_headline_to_archive(headline)
 
   local destination_file = self.files:get(archive_location)
   local todo_state = headline:get_todo()
-
+  EventManager.dispatch(HeadlineArchivedEvent:new(headline, destination_file))
   local target_line = self:_refile_from_org_file({
     source_headline = headline,
     destination_file = destination_file,
@@ -477,17 +479,17 @@ function Capture:build_note_capture(title)
       end
       local finalize_map = maps.org_note_finalize
       finalize_map.map_entry
-        :with_handler(function()
-          return capture_window:finish()
-        end)
-        :attach(finalize_map.default_map, finalize_map.user_map, finalize_map.opts)
+          :with_handler(function()
+            return capture_window:finish()
+          end)
+          :attach(finalize_map.default_map, finalize_map.user_map, finalize_map.opts)
 
       local kill_map = maps.org_note_kill
       kill_map.map_entry
-        :with_handler(function()
-          return capture_window:kill()
-        end)
-        :attach(kill_map.default_map, kill_map.user_map, kill_map.opts)
+          :with_handler(function()
+            return capture_window:kill()
+          end)
+          :attach(kill_map.default_map, kill_map.user_map, kill_map.opts)
     end,
   })
 end

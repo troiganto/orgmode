@@ -10,6 +10,7 @@ local TodoChangedEvent = {
 ---@param headline OrgHeadline
 ---@param old_todo_state? string
 ---@param was_done? boolean
+---@return OrgTodoChangedEvent
 function TodoChangedEvent:new(headline, old_todo_state, was_done)
   local obj = setmetatable({}, self)
   self.__index = self

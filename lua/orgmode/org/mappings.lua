@@ -52,7 +52,7 @@ function OrgMappings:set_tags(tags)
       return utils.prompt_autocomplete(arg_lead, self.files:get_tags())
     end)
   elseif type(tags) == 'table' then
-    tags = string.format(':%s:', table.concat(tags, ':'))
+    tags = utils.tags_to_string(tags)
   end
 
   return headline:set_tags(tags)
@@ -362,7 +362,7 @@ function OrgMappings:toggle_heading()
     line = line:gsub('^%*+%s', '')
   else
     line = line:gsub('^(%s*)', '')
-    if line:match('^[%*-]%s') then -- handle lists
+    if line:match('^[%*-]%s') then     -- handle lists
       line = line:gsub('^[%*-]%s', '') -- strip bullet
       local todo_keywords = config:get_todo_keywords()
       line = line:gsub('^%[([X%s])%]%s', function(checkbox_state)
@@ -932,34 +932,34 @@ function OrgMappings:org_deadline()
   local headline = self.files:get_closest_headline()
   local deadline_date = headline:get_deadline_date()
   return Calendar.new({ date = deadline_date or Date.today(), clearable = true, title = 'Set deadline' })
-    :open()
-    :next(function(new_date, cleared)
-      if cleared then
-        return headline:remove_deadline_date()
-      end
-      if not new_date then
-        return nil
-      end
-      headline:remove_closed_date()
-      headline:set_deadline_date(new_date)
-    end)
+      :open()
+      :next(function(new_date, cleared)
+        if cleared then
+          return headline:remove_deadline_date()
+        end
+        if not new_date then
+          return nil
+        end
+        headline:remove_closed_date()
+        headline:set_deadline_date(new_date)
+      end)
 end
 
 function OrgMappings:org_schedule()
   local headline = self.files:get_closest_headline()
   local scheduled_date = headline:get_scheduled_date()
   return Calendar.new({ date = scheduled_date or Date.today(), clearable = true, title = 'Set schedule' })
-    :open()
-    :next(function(new_date, cleared)
-      if cleared then
-        return headline:remove_scheduled_date()
-      end
-      if not new_date then
-        return nil
-      end
-      headline:remove_closed_date()
-      headline:set_scheduled_date(new_date)
-    end)
+      :open()
+      :next(function(new_date, cleared)
+        if cleared then
+          return headline:remove_scheduled_date()
+        end
+        if not new_date then
+          return nil
+        end
+        headline:remove_closed_date()
+        headline:set_scheduled_date(new_date)
+      end)
 end
 
 ---@param inactive boolean

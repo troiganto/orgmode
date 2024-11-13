@@ -5,6 +5,14 @@
 ---@field org_resource_download_policy 'always' | 'prompt' | 'safe' | 'never'
 ---@field org_use_property_inheritance boolean | string | string[]
 ---@field calendar { round_min_with_hours: boolean, min_big_step: number, min_small_step: number? }
+---@field org_attach_preferred_new_method 'id' | 'dir' | 'ask' | false
+---@field org_attach_method 'mv' | 'cp' | 'ln' | 'lns'
+---@field org_attach_visit_command string | fun(dir: string)
+---@field org_attach_use_inheritance 'always' | 'selective' | 'never'
+---@field org_attach_store_link_p 'original' | 'file' | 'attached' | false
+---@field org_attach_archive_delete 'always' | 'ask' | 'never'
+---@field org_attach_id_to_path_function_list (string | fun(id: string): (string|nil))[]
+---@field org_attach_sync_delete_empty_dir 'always' | 'ask' | 'never'
 local DefaultConfig = {
   org_agenda_files = '',
   org_default_notes_file = '',
@@ -70,6 +78,23 @@ local DefaultConfig = {
   },
   org_resource_download_policy = 'prompt',
   org_safe_remote_resources = {},
+  org_attach_id_dir = './data/',
+  org_attach_dir_relative = false,
+  org_attach_auto_tag = 'ATTACH',
+  org_attach_preferred_new_method = 'id',
+  org_attach_method = 'cp',
+  org_attach_copy_directory_create_symlink = false,
+  org_attach_visit_command = 'edit',
+  org_attach_expert = false,
+  org_attach_use_inheritance = 'selective',
+  org_attach_store_link_p = 'attached',
+  org_attach_archive_delete = 'never',
+  org_attach_id_to_path_function_list = {
+    'uuid_folder_format',
+    'ts_folder_format',
+    'fallback_folder_format',
+  },
+  org_attach_sync_delete_empty_dir = 'ask',
   win_split_mode = 'horizontal',
   win_border = 'single',
   notifications = {
@@ -185,6 +210,7 @@ local DefaultConfig = {
       org_set_effort = '<prefix>xe',
       org_show_help = 'g?',
       org_babel_tangle = '<prefix>bt',
+      org_attach = '<prefix><C-A>',
     },
     edit_src = {
       org_edit_src_abort = '<prefix>k',

@@ -510,29 +510,6 @@ _type_: `table<string, string>`<br />
 _default value_: `{ [':tangle'] = 'no', [':noweb']  = no }`<br />
 Default header args for extracting source code. See [Extract source code (tangle)](#extract-source-code-tangle) for more details.
 
-#### **org_resource_download_policy**
-_type_: `'always' | 'prompt' | 'safe' | 'never'`<br />
-_default value_: `'prompt'`<br />
-Policy applied to requests to obtain remote resources.
-
-- `always` - Always download remote resources (dangerous!)
-- `prompt` - Prompt before downloading an unsafe resource
-- `safe` - Only download resources allowed by [org_safe_remote_resources](#org_safe_remote_resources)
-- `never` - Never download any resources
-
-In Emacs orgmode, this affects keywords like `#+setupfile` and `#+include` on
-export, `org-persist-write:url`; and `org-attach-url` in non-interactive
-sessions. Nvim orgmode currently does not use this option, but defines it for
-future use.
-
-#### **org_safe_remote_resources**
-_type_: `string[]`<br />
-_default value_: `{}`<br />
-
-List of regex patterns matching safe URIs. URI regexps are applied to both URLs
-and Org files requesting remote resources. The test uses `vim.regex()`, so the
-regexes are always interpreted as magic and case-sensitive.
-
 #### **calendar_week_start_day**
 
 _type_: `number`<br />
@@ -838,8 +815,8 @@ When 0, place tags directly after headline text, with only one space in between.
 
 #### **org_use_tag_inheritance**
 
-_type_: `boolean`
-_default value_: `true`
+_type_: `boolean`<br />
+_default value_: `true`<br />
 When set to `true`, tags are inherited from parents for purposes of searching. Which means that if you have this structure:
 
 ```
@@ -859,6 +836,165 @@ _type_: `string[]`<br />
 _default value_: `{}`<br />
 List of tags that are excluded from inheritance.<br />
 Using the example above, setting this variable to `{'MYTAG'}`, second and third headline would have only `CHILDTAG`, where `MYTAG` would not be inherited.<br />
+
+### Attachment settings
+
+#### **org_attach_id_dir**
+_type_: `string`<br />
+_default value_: `'./data/'`<br />
+
+The directory where attachments are stored. If this is a relative path, it will
+be interpreted relative to the directory where the Org file lives.
+
+#### **org_attach_dir_relative**
+_type_: `boolean`<br />
+_default value_: `false`<br />
+
+If `true`, whenever you add a `DIR` property to a headline, it is added as
+a relative path. The default is to only add absolute paths.
+
+#### **org_attach_auto_tag**
+_type_: `string`<br />
+_default value_: `'ATTACH'`<br />
+
+Tag that is added automatically when attaching files to a headline.
+
+#### **org_attach_preferred_new_method**
+_type_: `'id'|'dir'|'ask'|false`<br />
+_default value_: `'id'`<br />
+
+This setting is used when attaching files to nodes that have neither an `ID`
+nor a `DIR` property.
+
+- `id` - create and use an `ID` property
+- `dir` - create and use a `DIR` property
+- `ask` - ask the user which method to use
+- `false` - don't create a property; the user has to define it explicitly before attaching files
+
+#### **org_attach_method**
+_type_: `'cp'|'mv'|'ln'|'lns'`<br />
+_default value_: `'cp'`<br />
+
+The preferred method to add files to the attachment directory.
+
+- `mv` - move (rename) the file
+- `cp` - copy the file
+- `ln` - create a hard link; not supported on all systems
+- `lns` - create a symbol link;  not supported on all systems; on Windows, this always creates a *junction*
+
+#### **org_attach_copy_directory_create_symlink**
+_type_: `boolean`<br />
+_default value_: `false`<br />
+
+<!-- TODO link set/unset directory to mappings -->
+
+If `true`, whenever the attachments directory itself is a symlink, and it is
+copied due to the `set_directory` or `unset_directory` action, copy the symlink
+itself. The default is to treat the symlink transparently as a directory.
+
+#### **org_attach_visit_command**
+_type_: `string|fun(path: string)`<br />
+_default value_: `'edit'`<br />
+
+Command or function used to open a directory. The default opens NetRW if it is
+available.
+
+#### **org_attach_expert**
+_type_: `boolean`<br />
+_default value_: `false`<br />
+
+If `true`, do not show the splash buffer with the attach dispatcher.
+
+#### **org_attach_use_inheritance**
+_type_: `'always'|'selective'|'never'`<br />
+_default value_: `'selective'`<br />
+
+Attachment inheritance for the outline.
+
+Enabling inheritance implies two things:
+1. Attachment links will look through all parent headlines until they find the
+   linked attachment.
+2. Running `attach` inside a node without attachments will operate on the first
+   parent headline that has an attachment.
+
+Possible values are:
+
+- `always` - inherit attachments
+- `selective` - respect `org_use_property_inheritance` for the properties `DIR` and `ID`
+- `never` - don't inherit attachments
+
+#### **org_attach_store_link_p**
+_type_: `'attached'|'file'|'original'|false`<br />
+_default value_: `'attached`<br />
+
+If not `false`, store a link with [org_store_link](#org_store_link) when
+attaching a file.
+
+- `attach` - store a `[[attachment:name]]` link
+- `file` - store a `[[file:attach_dir/name]]` link
+- `original` - store a `[[file:original/location]]` link
+
+#### **org_attach_archive_delete**
+_type_: `'always'|'ask'|'never'`<br />
+_default value_: `'never'`<br />
+
+Determines whether attachments are deleted automatically whenever a subtree is
+moved to an archive file. The value `'ask'` means to ask the user.
+
+#### **org_attach_id_to_path_function_list**
+_type_: `(string | fun(id: string): (string|nil))[]`<br />
+_default value_: `{ 'uuid_folder_format', 'ts_folder_format', 'fallback_folder_format' }`<br />
+
+List of functions that are tried sequentially to derive an attachment path from
+an `ID` property. The functions are called with a single `id` argument until
+the return value is an existing folder. The ID format passed to the functions
+is usually defined by [org_id_method](#org_id_method).
+
+If no folder has been created yet for the given ID, then the first truthy value
+defines the path of the folder to be created.
+
+The default frunctions avoid putting all attachment directories directly inside 
+[org_attach_id_dir](#org_attach_id_dir). Some file systems have performance
+issues in such scenarios.
+
+Be careful when changing this setting. If you remove a function, previously
+created attachment folders may be no longer mapped correctly and Org may be
+unable to detect them.
+
+#### **org_attach_sync_delete_empty_dir**
+_type_: `'always'|'ask'|'never'`<br />
+_default value_: `'ask'`<br />
+
+<!-- TODO link sync directory to mappings -->
+
+Determines whether to delete empty directories during `org_attach_sync`.
+
+- `never` - never delete empty directories
+- `ask` - ask the user whether to delete
+- `always` - delete empty directories without asking
+
+#### **org_resource_download_policy**
+_type_: `'always' | 'prompt' | 'safe' | 'never'`<br />
+_default value_: `'prompt'`<br />
+Policy applied to requests to obtain remote resources.
+
+- `always` - Always download remote resources (dangerous!)
+- `prompt` - Prompt before downloading an unsafe resource
+- `safe` - Only download resources allowed by [org_safe_remote_resources](#org_safe_remote_resources)
+- `never` - Never download any resources
+
+In Emacs orgmode, this affects keywords like `#+setupfile` and `#+include` on
+export, `org-persist-write:url`; and `org-attach-url` in non-interactive
+sessions. Nvim orgmode currently does not use this option, but defines it for
+future use.
+
+#### **org_safe_remote_resources**
+_type_: `string[]`<br />
+_default value_: `{}`<br />
+
+List of regex patterns matching safe URIs. URI regexps are applied to both URLs
+and Org files requesting remote resources. The test uses `vim.regex()`, so the
+regexes are always interpreted as magic and case-sensitive.
 
 ## Mappings
 

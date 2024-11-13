@@ -8,6 +8,7 @@ local HeadlineDemotedEvent = {
 
 ---@param headline OrgHeadline
 ---@param old_level number
+---@return OrgHeadlineDemotedEvent
 function HeadlineDemotedEvent:new(headline, old_level)
   local obj = setmetatable({}, self)
   self.__index = self

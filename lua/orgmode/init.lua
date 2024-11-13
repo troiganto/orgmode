@@ -5,6 +5,7 @@ local instance = nil
 local auto_instance_keys = {
   files = true,
   agenda = true,
+  attach = true,
   capture = true,
   clock = true,
   org_mappings = true,
@@ -49,11 +50,12 @@ function Org:init()
   self.highlighter = require('orgmode.colors.highlighter'):new()
   require('orgmode.colors.highlights').define_highlights()
   self.files = require('orgmode.files')
-    :new({
-      paths = require('orgmode.config').org_agenda_files,
-    })
-    :load_sync(true, 20000)
+      :new({
+        paths = require('orgmode.config').org_agenda_files,
+      })
+      :load_sync(true, 20000)
   self.links = require('orgmode.org.links'):new({ files = self.files })
+  self.attach = require('orgmode.attach'):new({ files = self.files, links = self.links })
   self.agenda = require('orgmode.agenda'):new({
     files = self.files,
   })
@@ -126,10 +128,10 @@ function Org.setup(opts)
     if config.notifications.enabled and #vim.api.nvim_list_uis() > 0 then
       Org.files:load():next(vim.schedule_wrap(function()
         instance.notifications = require('orgmode.notifications')
-          :new({
-            files = Org.files,
-          })
-          :start_timer()
+            :new({
+              files = Org.files,
+            })
+            :start_timer()
       end))
     end
     config:setup_mappings('global')
@@ -194,10 +196,10 @@ function Org.cron(opts)
     end
     Org.files:load_sync(true, 20000)
     instance.notifications = require('orgmode.notifications')
-      :new({
-        files = Org.files,
-      })
-      :cron()
+        :new({
+          files = Org.files,
+        })
+        :cron()
   end)
 
   if not ok then

@@ -25,13 +25,9 @@ describe('Remote resource', function()
     before_each(function()
       config:extend({
         org_resource_download_policy = 'safe',
-<<<<<<< HEAD
-        org_safe_remote_resources = { 'example\\.com' },
-=======
         -- This implicitly tests that we use actual regexes and not Lua
         -- patterns (which would use `%` as escape character, not `\`).
         org_safe_remote_resources = { '^https://.*\\.com/\\?$' },
->>>>>>> 6adb123 (feat(dev): add interface for safe downloads)
       })
     end)
     it('accepts safe URLs', function()
@@ -79,23 +75,15 @@ describe('Remote resource', function()
         assert.is.False(remote.should_fetch(UNSAFE_URL):wait())
       end)
       it('accepts forever with "f"', function()
-<<<<<<< HEAD
-=======
         local todo_file = vim.fn.getcwd() .. '/tests/plenary/fixtures/todo.org'
         vim.cmd.edit(todo_file)
->>>>>>> 6adb123 (feat(dev): add interface for safe downloads)
         vim.api.nvim_input('f')
         assert.is.True(remote.should_fetch(SAFE_URL):wait())
         config:extend({ org_resource_download_policy = 'safe' })
         assert.is.True(remote.should_fetch(SAFE_URL):wait())
-<<<<<<< HEAD
-        assert.is.True(remote.should_fetch(SAFE_URL .. '/more'):wait())
-        assert.is.False(remote.should_fetch(UNSAFE_URL):wait())
-=======
         assert.is.True(remote.should_fetch(UNSAFE_URL):wait())
         vim.api.nvim_buf_set_name(0, '')
         assert.is.False(remote.should_fetch(SAFE_URL):wait())
->>>>>>> 6adb123 (feat(dev): add interface for safe downloads)
       end)
     end)
   end)
