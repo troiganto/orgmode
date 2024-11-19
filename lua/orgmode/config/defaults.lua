@@ -2,6 +2,7 @@
 ---@field org_id_method 'uuid' | 'ts' | 'org'
 ---@field org_agenda_span 'day' | 'week' | 'month' | 'year' | number
 ---@field org_log_repeat 'time' | 'note' | false
+---@field org_resource_download_policy 'always' | 'prompt' | 'safe' | 'never'
 ---@field calendar { round_min_with_hours: boolean, min_big_step: number, min_small_step: number? }
 local DefaultConfig = {
   org_agenda_files = '',
@@ -11,7 +12,7 @@ local DefaultConfig = {
   org_todo_keyword_faces = {},
   org_deadline_warning_days = 14,
   org_agenda_min_height = 16,
-  org_agenda_span = 'week', -- day/week/month/year/number of days
+  org_agenda_span = 'week',   -- day/week/month/year/number of days
   org_agenda_start_on_weekday = 1,
   org_agenda_start_day = nil, -- start from today + this modifier
   calendar_week_start_day = 1,
@@ -65,6 +66,8 @@ local DefaultConfig = {
     [':tangle'] = 'no',
     [':noweb'] = 'no',
   },
+  org_resource_download_policy = 'prompt',
+  org_safe_remote_resources = {},
   win_split_mode = 'horizontal',
   win_border = 'single',
   notifications = {
@@ -153,10 +156,10 @@ local DefaultConfig = {
       org_do_demote = '>>',
       org_promote_subtree = '<s',
       org_demote_subtree = '>s',
-      org_meta_return = '<Leader><CR>', -- Add heading, item or row (context-dependent)
+      org_meta_return = '<Leader><CR>',                       -- Add heading, item or row (context-dependent)
       org_return = '<CR>',
-      org_insert_heading_respect_content = '<prefix>ih', -- Add new heading after current heading block (same level)
-      org_insert_todo_heading = '<prefix>iT', -- Add new todo heading right after current heading (same level)
+      org_insert_heading_respect_content = '<prefix>ih',      -- Add new heading after current heading block (same level)
+      org_insert_todo_heading = '<prefix>iT',                 -- Add new todo heading right after current heading (same level)
       org_insert_todo_heading_respect_content = '<prefix>it', -- Add new todo heading after current heading block (same level)
       org_move_subtree_up = '<prefix>K',
       org_move_subtree_down = '<prefix>J',

@@ -39,20 +39,20 @@ function OrgState:save()
   self:load()
   self._ctx.savers = self._ctx.savers + 1
   return utils
-    .writefile(cache_path, vim.json.encode(OrgState.data))
-    :next(function()
-      self._ctx.savers = self._ctx.savers - 1
-      if self._ctx.savers == 0 then
-        OrgState._ctx.saved = true
-        OrgState._ctx.dirty = false
-      end
-    end)
-    :catch(function(err_msg)
-      self._ctx.savers = self._ctx.savers - 1
-      vim.schedule_wrap(function()
-        utils.echo_warning('Failed to save current state! Error: ' .. err_msg)
+      .writefile(cache_path, vim.json.encode(OrgState.data))
+      :next(function()
+        self._ctx.savers = self._ctx.savers - 1
+        if self._ctx.savers == 0 then
+          OrgState._ctx.saved = true
+          OrgState._ctx.dirty = false
+        end
       end)
-    end)
+      :catch(function(err_msg)
+        self._ctx.savers = self._ctx.savers - 1
+        vim.schedule_wrap(function()
+          utils.echo_warning('Failed to save current state! Error: ' .. err_msg)
+        end)
+      end)
 end
 
 ---Synchronously save the state into cache
@@ -82,51 +82,51 @@ function OrgState:load()
   end
 
   self._ctx.curr_loader = utils
-    .readfile(cache_path, { raw = true })
-    :next(function(data)
-      local success, decoded = pcall(vim.json.decode, data, {
-        luanil = { object = true, array = true },
-      })
-      if not success then
-        local err_msg = vim.deepcopy(decoded)
-        vim.schedule(function()
-          utils.echo_warning('OrgState cache load failure, error: ' .. vim.inspect(err_msg))
-          -- Try to 'repair' the cache by saving the current state
+      .readfile(cache_path, { raw = true })
+      :next(function(data)
+        local success, decoded = pcall(vim.json.decode, data, {
+          luanil = { object = true, array = true },
+        })
+        if not success then
+          local err_msg = vim.deepcopy(decoded)
+          vim.schedule(function()
+            utils.echo_warning('OrgState cache load failure, error: ' .. vim.inspect(err_msg))
+            -- Try to 'repair' the cache by saving the current state
+            self._ctx.dirty = true
+            self:save()
+          end)
+        end
+        -- Because the state cache repair happens potentially after the data has
+        -- been added to the cache, we need to ensure the decoded table is set to
+        -- empty if we got an error back on the json decode operation.
+        if type(decoded) ~= 'table' then
+          decoded = {}
+        end
+
+        -- It is possible that while the state was loading from cache values
+        -- were saved into the state. We want to preference the newer values in
+        -- the state and still get whatever values may not have been set in the
+        -- interim of the load operation.
+        self.data = vim.tbl_deep_extend('force', decoded, self.data)
+        self._ctx.curr_loader = nil
+        return self
+      end)
+      :catch(function(err)
+        -- If the file didn't exist then go ahead and save
+        -- our current cache and as a side effect create the file
+        if type(err) == 'string' and err:match([[^ENOENT.*]]) then
           self._ctx.dirty = true
           self:save()
-        end)
-      end
-      -- Because the state cache repair happens potentially after the data has
-      -- been added to the cache, we need to ensure the decoded table is set to
-      -- empty if we got an error back on the json decode operation.
-      if type(decoded) ~= 'table' then
-        decoded = {}
-      end
-
-      -- It is possible that while the state was loading from cache values
-      -- were saved into the state. We want to preference the newer values in
-      -- the state and still get whatever values may not have been set in the
-      -- interim of the load operation.
-      self.data = vim.tbl_deep_extend('force', decoded, self.data)
-      self._ctx.curr_loader = nil
-      return self
-    end)
-    :catch(function(err)
-      -- If the file didn't exist then go ahead and save
-      -- our current cache and as a side effect create the file
-      if type(err) == 'string' and err:match([[^ENOENT.*]]) then
-        self._ctx.dirty = true
-        self:save()
-        return self
-      end
-      -- If the file did exist, something is wrong. Kick this to the top
-      error(err)
-    end)
-    :finally(function()
-      self._ctx.loaded = true
-      self._ctx.curr_loader = nil
-      self._ctx.dirty = false
-    end)
+          return self
+        end
+        -- If the file did exist, something is wrong. Kick this to the top
+        error(err)
+      end)
+      :finally(function()
+        self._ctx.loaded = true
+        self._ctx.curr_loader = nil
+        self._ctx.dirty = false
+      end)
 
   return self._ctx.curr_loader
 end
@@ -138,13 +138,13 @@ function OrgState:load_sync(timeout)
   local state
   local err
   self
-    :load()
-    :next(function(loaded_state)
-      state = loaded_state
-    end)
-    :catch(function(reject)
-      err = reject
-    end)
+      :load()
+      :next(function(loaded_state)
+        state = loaded_state
+      end)
+      :catch(function(reject)
+        err = reject
+      end)
 
   vim.wait(timeout or 500, function()
     return state ~= nil or err ~= nil
@@ -172,7 +172,7 @@ function OrgState:wipe(overwrite)
   self._ctx.saved = false
   self._ctx.dirty = true
   if overwrite then
-    state:save_sync()
+    self:save_sync()
   end
 end
 

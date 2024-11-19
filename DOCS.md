@@ -492,6 +492,29 @@ _type_: `table<string, string>`<br />
 _default value_: `{ [':tangle'] = 'no', [':noweb']  = no }`<br />
 Default header args for extracting source code. See [Extract source code (tangle)](#extract-source-code-tangle) for more details.
 
+#### **org_resource_download_policy**
+_type_: `'always' | 'prompt' | 'safe' | 'never'`<br />
+_default value_: `'prompt'`<br />
+Policy applied to requests to obtain remote resources.
+
+- `always` - Always download remote resources (dangerous!)
+- `prompt` - Prompt before downloading an unsafe resource
+- `safe` - Only download resources allowed by [org_safe_remote_resources](#org_safe_remote_resources)
+- `never` - Never download any resources
+
+In Emacs orgmode, this affects keywords like `#+setupfile` and `#+include` on
+export, `org-persist-write:url`; and `org-attach-url` in non-interactive
+sessions. Nvim orgmode currently does not use this option, but defines it for
+future use.
+
+#### **org_safe_remote_resources**
+_type_: `string[]`<br />
+_default value_: `{}`<br />
+
+List of regex patterns matching safe URIs. URI regexps are applied to both URLs
+and Org files requesting remote resources. The test uses `vim.regex()`, so the
+regexes are always interpreted as magic and case-sensitive.
+
 #### **calendar_week_start_day**
 
 _type_: `number`<br />
