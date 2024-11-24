@@ -99,9 +99,10 @@ function Clock:org_clock_goto()
 end
 
 function Clock:org_set_effort()
+  -- TODO: Shouldn't this look at the clocked headline?
   local item = self.files:get_closest_headline()
   -- TODO: Add Effort_ALL property as autocompletion
-  local current_effort = item:get_property('Effort')
+  local current_effort = item:get_property('Effort', false)
   local effort = vim.fn.OrgmodeInput('Effort: ', current_effort or '')
   local duration = Duration.parse(effort)
   if duration == nil then
@@ -115,7 +116,7 @@ function Clock:get_statusline()
     return ''
   end
 
-  local effort = self.clocked_headline:get_property('effort')
+  local effort = self.clocked_headline:get_property('effort', false)
   local total = self.clocked_headline:get_logbook():get_total_with_active():to_string()
   if effort then
     return string.format('(Org) [%s/%s] (%s)', total, effort or '', self.clocked_headline:get_title())

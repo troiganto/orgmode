@@ -486,6 +486,24 @@ _type_: `boolean`<br />
 _default value_: `false`<br />
 If `true`, generate ID with the Org ID module and append it to the headline as property. More info on [org_store_link](#org_store_link)
 
+#### **org_use_property_inheritance**
+_type_: `boolean | string | string[]`<br />
+_default value_: `false`<br />
+Determine whether properties of one headline are inherited by sub-headlines.
+
+- `false` - properties only pertain to the file or headline that defines them
+- `true` - properties of a headlines also pertain to all its sub-headlines
+- `string[]` - only the properties named in the given list are inherited
+- `string` - only properties matching the given regex are inherited
+
+Note that for a select few properties, the inheritance behavior is hard-coded. These properties are:
+- `ARCHIVE` - always inherited
+- `CATEGORY` - always inherited
+- `COLUMNS` - not currently implemented, but emacs orgmode states that column view always starts at the closest headline that has a `COLUMNS` property
+- `CUSTOM_ID` - never inherited
+- `ID` - never inherited
+- `header-args` - always inherited
+
 #### **org_babel_default_header_args**
 
 _type_: `table<string, string>`<br />

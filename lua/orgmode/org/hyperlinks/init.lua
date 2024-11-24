@@ -57,7 +57,7 @@ function Hyperlinks.as_custom_id_anchors(url)
   return function(headlines)
     return vim.tbl_map(function(headline)
       ---@cast headline OrgHeadline
-      local custom_id = headline:get_property('custom_id')
+      local custom_id = headline:get_property('custom_id', false)
       return ('%s#%s'):format(prefix, custom_id)
     end, headlines)
   end
@@ -258,11 +258,11 @@ function Hyperlinks.insert_link(link_location)
   local linenr = vim.fn.line('.') or 0
   local curr_line = vim.fn.getline(linenr)
   local new_line = string.sub(curr_line, 0, insert_from)
-    .. '['
-    .. link_location
-    .. link_description
-    .. ']'
-    .. string.sub(curr_line, insert_to, #curr_line)
+      .. '['
+      .. link_location
+      .. link_description
+      .. ']'
+      .. string.sub(curr_line, insert_to, #curr_line)
 
   vim.fn.setline(linenr, new_line)
   vim.fn.cursor(linenr, target_col)

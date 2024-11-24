@@ -7,6 +7,14 @@ local mappings = require('orgmode.config.mappings')
 local TodoKeywords = require('orgmode.objects.todo_keywords')
 local PriorityState = require('orgmode.objects.priority_state')
 
+-- Used by Config:use_property_inheritance()
+local hardcoded_property_inheritance = {
+  archive = true,
+  category = true,
+  columns = false,
+  ['header-args'] = true,
+}
+
 ---@class OrgConfig:OrgDefaultConfig
 ---@field opts table
 ---@field todo_keywords OrgTodoKeywords
@@ -70,7 +78,7 @@ function Config:_are_priorities_valid(opts)
     if not (high and low and default) then
       utils.echo_warning(
         'org_priority_highest, org_priority_lowest and org_priority_default can only be set together.'
-          .. 'Falling back to default priorities'
+        .. 'Falling back to default priorities'
       )
       return false
     end
@@ -80,7 +88,7 @@ function Config:_are_priorities_valid(opts)
       if high < 0 or low < 0 or default < 0 then
         utils.echo_warning(
           'org_priority_highest, org_priority_lowest and org_priority_default cannot be negative.'
-            .. 'Falling back to default priorities'
+          .. 'Falling back to default priorities'
         )
         return false
       end
@@ -93,20 +101,20 @@ function Config:_are_priorities_valid(opts)
       if default < high or default > low then
         utils.echo_warning(
           'org_priority_default must be bigger than org_priority_highest and smaller than org_priority_lowest.'
-            .. 'Falling back to default priorities'
+          .. 'Falling back to default priorities'
         )
         return false
       end
-    -- one-char strings
+      -- one-char strings
     elseif
-      (type(high) == 'string' and #high == 1)
-      and (type(low) == 'string' and #low == 1)
-      and (type(default) == 'string' and #default == 1)
+        (type(high) == 'string' and #high == 1)
+        and (type(low) == 'string' and #low == 1)
+        and (type(default) == 'string' and #default == 1)
     then
       if not high:match('%a') or not low:match('%a') or not default:match('%a') then
         utils.echo_warning(
           'org_priority_highest, org_priority_lowest and org_priority_default must be letters.'
-            .. 'Falling back to default priorities'
+          .. 'Falling back to default priorities'
         )
         return false
       end
@@ -123,15 +131,15 @@ function Config:_are_priorities_valid(opts)
       if default < high or default > low then
         utils.echo_warning(
           'org_priority_default must be bigger than org_priority_highest and smaller than org_priority_lowest.'
-            .. 'Falling back to default priorities'
+          .. 'Falling back to default priorities'
         )
         return false
       end
     else
       utils.echo_warning(
         'org_priority_highest, org_priority_lowest and org_priority_default must be either of type'
-          .. "'number' or of type 'string' of length one. All three options need to agree on this type."
-          .. 'Falling back to default priorities'
+        .. "'number' or of type 'string' of length one. All three options need to agree on this type."
+        .. 'Falling back to default priorities'
       )
       return false
     end
@@ -510,6 +518,29 @@ function Config:parse_header_args(args)
   end
 
   return results
+end
+
+---@param property_name string
+---@return boolean uses_inheritance
+function Config:use_property_inheritance(property_name)
+  property_name = string.lower(property_name)
+  local hard_result = hardcoded_property_inheritance[property_name]
+  if hard_result ~= nil then
+    return hard_result
+  end
+
+  local use_inheritance = self.opts.org_use_property_inheritance or false
+  local type_ = type(use_inheritance)
+  if type_ == 'table' then
+    return vim.tbl_contains(use_inheritance, function(value)
+      return vim.stricmp(value, property_name) == 0
+    end, { predicate = true })
+  end
+  if type_ == 'string' then
+    local regex = vim.regex(use_inheritance)
+    return regex:match_str(property_name) and true or false
+  end
+  return use_inheritance and true or false
 end
 
 ---@type OrgConfig

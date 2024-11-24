@@ -3,6 +3,7 @@
 ---@field org_agenda_span 'day' | 'week' | 'month' | 'year' | number
 ---@field org_log_repeat 'time' | 'note' | false
 ---@field org_resource_download_policy 'always' | 'prompt' | 'safe' | 'never'
+---@field org_use_property_inheritance boolean | string | string[]
 ---@field calendar { round_min_with_hours: boolean, min_big_step: number, min_small_step: number? }
 local DefaultConfig = {
   org_agenda_files = '',
@@ -62,6 +63,7 @@ local DefaultConfig = {
   org_id_method = 'uuid',
   org_id_prefix = nil,
   org_id_link_to_org_use_id = false,
+  org_use_property_inheritance = false,
   org_babel_default_header_args = {
     [':tangle'] = 'no',
     [':noweb'] = 'no',
