@@ -1,6 +1,6 @@
-local config = require('orgmode.config')
-local fsops = require('orgmode.attach.fsops')
 local Promise = require('orgmode.utils.promise')
+local config = require('orgmode.config')
+local fileops = require('orgmode.attach.fileops')
 
 local M = {}
 
@@ -10,32 +10,32 @@ local M = {}
 function M.import_file(source, method)
   if method == 'mv' then
     return function(target)
-      return fsops.rename(source, target)
+      return fileops.rename(source, target)
     end
   end
   if method == 'cp' then
     return function(target)
-      return fsops.is_dir(source):next(function(is_dir)
+      return fileops.is_dir(source):next(function(is_dir)
         if is_dir then
-          return fsops.copy_directory(source, target, {
+          return fileops.copy_directory(source, target, {
             parents = false,
             keep_times = false,
             create_symlink = config.org_attach_copy_directory_create_symlink,
           })
         else
-          return fsops.copy_file(source, target, { excl = true, ficlone = true, ficlone_force = false })
+          return fileops.copy_file(source, target, { excl = true, ficlone = true, ficlone_force = false })
         end
       end)
     end
   end
   if method == 'ln' then
     return function(target)
-      return fsops.hardlink(source, target)
+      return fileops.hardlink(source, target)
     end
   end
   if method == 'lns' then
     return function(target)
-      return fsops.symlink(source, target, { dir = false, junction = false, exist_ok = false })
+      return fileops.symlink(source, target, { dir = false, junction = false, exist_ok = false })
     end
   end
   error('unknown org_attach_method: ' .. tostring(method))
@@ -45,7 +45,7 @@ end
 ---@return fun(target: string): OrgPromise<boolean> success
 function M.import_url(url)
   return function(target)
-    return fsops.download_file(url, target, { exist_ok = false })
+    return fileops.download_file(url, target, { exist_ok = false })
   end
 end
 
@@ -57,7 +57,7 @@ end
 ---@return fun(target: string): OrgPromise<boolean> success
 function M.import_buffer(bufnr)
   return function(target)
-    return fsops.exists(target)
+    return fileops.exists(target)
         :next(function(exists)
           if exists then
             return Promise.reject('EEXIST: ' .. target)

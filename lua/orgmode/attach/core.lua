@@ -4,7 +4,7 @@ local Importer = require('orgmode.attach.importer')
 local Promise = require('orgmode.utils.promise')
 local SetDirTask = require('orgmode.attach.setdirtask')
 local config = require('orgmode.config')
-local fsops = require('orgmode.attach.fsops')
+local fileops = require('orgmode.attach.fileops')
 local id_dir = require('orgmode.attach.id_dir')
 local utils = require('orgmode.utils')
 
@@ -267,7 +267,7 @@ function AttachCore:get_dir_or_create(node, method, new_dir)
     error(('unknown method: %s'):format(method))
   end
   local mode = 493 -- octal 0755 as decimal
-  fsops.make_dir(dir, { mode = mode, parents = true, exist_ok = true }):wait()
+  fileops.make_dir(dir, { mode = mode, parents = true, exist_ok = true }):wait()
   return dir
 end
 
@@ -456,7 +456,7 @@ function AttachCore:attach_buffer(node, bufnr, opts)
     if not success then
       return nil
     end
-    return fsops.exists(bufname):next(function(bufname_exists)
+    return fileops.exists(bufname):next(function(bufname_exists)
       EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
       node:toggle_auto_tag(true)
       local link = self.links:store_link_to_attachment({
@@ -535,7 +535,7 @@ function AttachCore:attach_new(node, name, opts)
   --TODO: the emacs version doesn't run the hook here. Is this correct?
   EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
   node:toggle_auto_tag(true)
-  return fsops.exists(path):next(function(already_exists)
+  return fileops.exists(path):next(function(already_exists)
     if already_exists then
       return Promise.reject('EEXIST: ' .. path)
     end
@@ -603,7 +603,7 @@ end
 function AttachCore:delete_one(node, name)
   local attach_dir = self:get_dir(node)
   local path = vim.fs.joinpath(attach_dir, name)
-  return fsops.unlink(path):next(function()
+  return fileops.unlink(path):next(function()
     EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
     return nil
   end)
@@ -638,7 +638,7 @@ function AttachCore:delete_all(node, recursive)
   if not recursive then
     error(errmsg)
   end
-  return fsops.remove_directory(attach_dir, { recursive = true })
+  return fileops.remove_directory(attach_dir, { recursive = true })
       :next(function()
         EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
         node:toggle_auto_tag(false)
@@ -649,7 +649,7 @@ end
 ---@param directory string
 ---@return boolean
 local function has_any_non_litter_files(directory)
-  for name in fsops.iterdir(directory) do
+  for name in fileops.iterdir(directory) do
     if not vim.endswith(name, '~') then
       return true
     end
@@ -679,7 +679,7 @@ function AttachCore:sync(node, delete_empty_dir)
   if not delete_empty_dir then
     return Promise.resolve()
   end
-  return fsops.remove_directory(attach_dir, { recursive = true })
+  return fileops.remove_directory(attach_dir, { recursive = true })
       :next(function()
         return attach_dir
       end)

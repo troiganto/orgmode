@@ -1,11 +1,9 @@
 local AttachNode = require('orgmode.attach.node')
 local EventManager = require('orgmode.events')
 local Menu = require('orgmode.ui.menu')
-local Promise = require('orgmode.utils.promise')
 local config = require('orgmode.config')
-local fsops = require('orgmode.attach.fsops')
+local fileops = require('orgmode.attach.fileops')
 local remote_resource = require('orgmode.objects.remote_resource')
-local ui_utils = require('orgmode.attach.ui')
 local utils = require('orgmode.utils')
 local Core = require('orgmode.attach.core')
 
@@ -508,7 +506,7 @@ local function list_files(directory, show_hidden)
   end
   local res = {}
   local files = {}
-  for name, ftype in fsops.iterdir(directory) do
+  for name, ftype in fileops.iterdir(directory) do
     if filter(name) then
       if ftype == 'link' then
         ftype = resolve_links(vim.fs.joinpath(directory, name))
@@ -915,7 +913,7 @@ function Attach:delete_all(force, node)
     return force or yes_or_no_or_cancel_slow('Recursive? ') == 'yes'
   end):next(function()
     utils.echo_info('Attachment directory removed')
-    return
+    return nil
   end):wait(MAX_TIMEOUT)
 end
 
@@ -934,17 +932,6 @@ function Attach:maybe_delete_archived(headline)
   if delete == 'ask' then
     self:delete_all(false, AttachNode.from_headline(headline))
   end
-end
-
----@param directory string
----@return boolean
-local function has_any_non_litter_files(directory)
-  for name in fsops.iterdir(directory) do
-    if not vim.endswith(name, '~') then
-      return true
-    end
-  end
-  return false
 end
 
 ---Synchronize the current outline node with its attachments.
