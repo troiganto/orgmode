@@ -1,6 +1,6 @@
 local AttachNode = require('orgmode.attach.node')
 local EventManager = require('orgmode.events')
-local Importer = require('orgmode.attach.importer')
+local methods = require('orgmode.attach.methods')
 local Promise = require('orgmode.utils.promise')
 local config = require('orgmode.config')
 local fileops = require('orgmode.attach.fileops')
@@ -380,10 +380,10 @@ end
 ---@return OrgPromise<string|nil> attachment_name
 function AttachCore:attach(node, file, opts)
   local basename = basename_safe(file)
-  local importer = Importer.import_file(file, opts.attach_method)
+  local attach = methods.get_file_attacher(opts.attach_method)
   local attach_dir = self:get_dir_or_create(node, opts.set_dir_method, opts.new_dir)
   local attach_file = vim.fs.joinpath(attach_dir, basename)
-  return importer(attach_file):next(function(success)
+  return attach(file, attach_file):next(function(success)
     if not success then
       return nil
     end
@@ -408,10 +408,9 @@ end
 ---@return OrgPromise<string|nil> attachment_name
 function AttachCore:attach_url(node, url, opts)
   local basename = basename_safe(url)
-  local importer = Importer.import_url(url)
   local attach_dir = self:get_dir_or_create(node, opts.set_dir_method, opts.new_dir)
   local attach_file = vim.fs.joinpath(attach_dir, basename)
-  return importer(attach_file):next(function(success)
+  return methods.attach_url(url, attach_file):next(function(success)
     if not success then
       return nil
     end
@@ -436,10 +435,9 @@ end
 function AttachCore:attach_buffer(node, bufnr, opts)
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local basename = basename_safe(bufname)
-  local importer = Importer.import_buffer(bufnr)
   local attach_dir = self:get_dir_or_create(node, opts.set_dir_method, opts.new_dir)
   local attach_file = vim.fs.joinpath(attach_dir, basename)
-  return importer(attach_file):next(function(success)
+  return methods.attach_buffer(bufnr, attach_file):next(function(success)
     if not success then
       return nil
     end
@@ -467,6 +465,7 @@ end
 ---@param opts orgmode.attach.core.attach.opts
 ---@return OrgPromise<orgmode.attach.core.attach_many.result> tally
 function AttachCore:attach_many(node, files, opts)
+  local attach = methods.get_file_attacher(opts.attach_method)
   ---@type orgmode.attach.core.attach_many.result
   local initial_tally = { successes = 0, failures = 0 }
   if #files == 0 then
@@ -475,10 +474,9 @@ function AttachCore:attach_many(node, files, opts)
   local attach_dir = self:get_dir_or_create(node, opts.set_dir_method, opts.new_dir)
   return Promise
       .map(function(to_be_attached)
-        local importer = Importer.import_file(to_be_attached, opts.attach_method)
         local basename = basename_safe(to_be_attached)
         local attach_file = vim.fs.joinpath(attach_dir, basename)
-        return importer(attach_file):next(function(success)
+        return attach(to_be_attached, attach_file):next(function(success)
           self.links:store_link_to_attachment({ attach_dir = attach_dir, original = to_be_attached })
           return success
         end)
