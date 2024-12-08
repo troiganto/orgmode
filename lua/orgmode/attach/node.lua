@@ -94,30 +94,12 @@ function AttachNode:get_start_line()
   return 0
 end
 
----Check whether to use property inheritance or not.
----
----This can be determined independently of `org_use_property_inheritance` via
----`org_attach_use_inheritance`.
----
----@param property_name string
----@return boolean
-local function use_inheritance(property_name)
-  local use_it = config.org_attach_use_inheritance
-  if use_it == 'always' then
-    return true
-  end
-  if use_it == 'never' then
-    return false
-  end
-  return config:use_property_inheritance(property_name)
-end
-
 ---@param property_name string property name
 ---@param search_parents? boolean whether to recurse to parents
 ---@return string|nil property
 function AttachNode:get_property(property_name, search_parents)
   if search_parents == nil then
-    search_parents = use_inheritance(property_name)
+    search_parents = config:use_attach_inheritance(property_name)
   end
   local property
   if self.headline then
