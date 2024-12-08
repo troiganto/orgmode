@@ -2,7 +2,6 @@ local AttachNode = require('orgmode.attach.node')
 local EventManager = require('orgmode.events')
 local Importer = require('orgmode.attach.importer')
 local Promise = require('orgmode.utils.promise')
-local SetDirTask = require('orgmode.attach.setdirtask')
 local config = require('orgmode.config')
 local fileops = require('orgmode.attach.fileops')
 local id_dir = require('orgmode.attach.id_dir')
@@ -261,8 +260,8 @@ function AttachCore:get_dir_or_create(node, method, new_dir)
       error(('Failed to get folder for id %s, adjust `%s'):format(id, 'org_attach_id_to_path_function_list'))
     end
   elseif method == 'dir' then
-    new_dir = thunk(new_dir)
-    dir = self:set_initial_directory(node, new_dir)
+    dir = node:set_dir(thunk(new_dir))
+    ---@todo figure out how and where to resolve `dir`!
   else
     error(('unknown method: %s'):format(method))
   end
@@ -286,31 +285,19 @@ end
 ---@param opts orgmode.attach.core.set_directory.opts
 ---@return OrgPromise<string | nil> new_dir
 function AttachCore:set_directory(node, new_dir, opts)
-  local task = SetDirTask.new(node)
-  task.new_dir = new_dir
-  task.do_property_change = true
-  task.do_copy = thunk(opts.do_copy, task.old_dir, task.new_dir)
-  task.do_delete = thunk(opts.do_delete, task.new_dir)
-  return task:run():next(function()
-    return new_dir
+  local old_dir = node:get_dir()
+  local do_copy = old_dir and thunk(opts.do_copy, old_dir, new_dir)
+  local do_delete = old_dir and thunk(opts.do_delete, old_dir)
+  -- Some checks are duplicated, but it keeps the code straightforward and the
+  -- type checker happy.
+  return Promise.resolve(old_dir and new_dir and do_copy and fileops.copy_directory(old_dir, new_dir, {
+    parents = true,
+    keep_times = true,
+    create_symlink = config.org_attach_copy_directory_create_symlink,
+  })):next(function()
+    node:set_dir(new_dir)
+    return Promise.resolve(old_dir and do_delete and fileops.remove_directory(old_dir, { recursive = true }))
   end)
-end
-
----Like `set_directory()` but for when `node:get_dir() == nil`.
----
----In this case, there is no asynchrony involved and we return the new
----directory immediately.
----
----@param node OrgAttachNode
----@param new_dir string
----@return string new_dir_resolved
-function AttachCore:set_initial_directory(node, new_dir)
-  local task = SetDirTask.new(node)
-  assert(not task.old_dir, 'set_initial_directory() node has initial directory')
-  task.new_dir = new_dir
-  task.do_property_change = true
-  task:change_property()
-  return assert(node:get_property('DIR'), 'change_property() failed')
 end
 
 ---Remove DIR node property.
@@ -327,14 +314,19 @@ end
 ---@param opts orgmode.attach.core.set_directory.opts
 ---@return OrgPromise<string | nil> new_dir
 function AttachCore:unset_directory(node, opts)
-  local task = SetDirTask.new(node)
-  node:set_property('DIR', nil)
-  task.new_dir = node:get_dir()
-  task.do_property_change = false
-  task.do_copy = thunk(opts.do_copy, task.old_dir, task.new_dir)
-  task.do_delete = thunk(opts.do_delete, task.old_dir)
-  return task:run():next(function()
-    return task.new_dir
+  local old_dir = node:get_dir()
+  node:set_dir()
+  local new_dir = node:get_dir() -- new dir potentially via parent nodes
+  local do_copy = old_dir and new_dir and thunk(opts.do_copy, old_dir, new_dir)
+  local do_delete = old_dir and thunk(opts.do_delete, old_dir)
+  -- Some checks are duplicated, but it keeps the code straightforward and the
+  -- type checker happy.
+  return Promise.resolve(old_dir and new_dir and do_copy and fileops.copy_directory(old_dir, new_dir, {
+    parents = true,
+    keep_times = true,
+    create_symlink = config.org_attach_copy_directory_create_symlink,
+  })):next(function()
+    return Promise.resolve(old_dir and do_delete and fileops.remove_directory(old_dir, { recursive = true }))
   end)
 end
 
@@ -358,14 +350,18 @@ function AttachCore:untag(node)
   node:toggle_auto_tag(false)
 end
 
+---Helper to the `attach_*()` functions.
 ---Like `vim.fs.basename()` but reject an empty string result.
----This also ignores trailing slashes.
+---This also ignores trailing slashes, e.g.:
+---* '/foo/bar' -> 'bar'
+---* '/foo/' -> 'foo'
+---* '/' -> error!
 ---@param path string
----@return string | nil basename
+---@return string basename
 local function basename_safe(path)
-  path = path:match('^(.*[^/])/*$')
-  local basename = path and vim.fs.basename(path)
-  return basename ~= '' and basename or nil
+  local match = path:match('^(.*[^/])/*$')
+  local basename = match and vim.fs.basename(match)
+  return basename ~= '' and basename or error('cannot determine attachment name: ' .. path)
 end
 
 ---@alias OrgAttachMethod 'cp' | 'mv' | 'ln' | 'lns'
@@ -384,9 +380,6 @@ end
 ---@return OrgPromise<string|nil> attachment_name
 function AttachCore:attach(node, file, opts)
   local basename = basename_safe(file)
-  if not basename then
-    error('cannot determine attachment name: ' .. file)
-  end
   local importer = Importer.import_file(file, opts.attach_method)
   local attach_dir = self:get_dir_or_create(node, opts.set_dir_method, opts.new_dir)
   local attach_file = vim.fs.joinpath(attach_dir, basename)
@@ -415,9 +408,6 @@ end
 ---@return OrgPromise<string|nil> attachment_name
 function AttachCore:attach_url(node, url, opts)
   local basename = basename_safe(url)
-  if not basename then
-    error('cannot determine attachment name: ' .. url)
-  end
   local importer = Importer.import_url(url)
   local attach_dir = self:get_dir_or_create(node, opts.set_dir_method, opts.new_dir)
   local attach_file = vim.fs.joinpath(attach_dir, basename)
@@ -446,9 +436,6 @@ end
 function AttachCore:attach_buffer(node, bufnr, opts)
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local basename = basename_safe(bufname)
-  if not basename then
-    error(('cannot determine name of buffer %d'):format(bufnr))
-  end
   local importer = Importer.import_buffer(bufnr)
   local attach_dir = self:get_dir_or_create(node, opts.set_dir_method, opts.new_dir)
   local attach_file = vim.fs.joinpath(attach_dir, basename)
