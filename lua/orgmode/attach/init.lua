@@ -958,43 +958,6 @@ function Attach:sync(node)
   return self.core:sync(node, delete_empty_dir):wait(MAX_TIMEOUT)
 end
 
----@param core OrgAttachCore
----@param file OrgFile
----@param callback fun(attach_dir: string|false, basename: string): string|nil
----@return nil
-local function on_every_attachment_link(core, file, callback)
-  -- TODO: In a better world, this would use treesitter for parsing ...
-  file:update_sync(function()
-    local lines = vim.api.nvim_buf_get_lines(0, 0, -1, true)
-    local prev_node = nil ---@type OrgAttachNode | nil
-    local attach_dir = nil ---@type string | false | nil
-    for i, line in ipairs(lines) do
-      -- Check if node has changed; if yes, invalidate cached attach_dir.
-      local node = AttachNode.at_cursor(file, { i + 1, 0 })
-      if node ~= prev_node then
-        attach_dir = nil
-      end
-      ---@param basename string
-      ---@param bracket '[' | ']'
-      ---@return string
-      local replaced = line:gsub('%[%[attachment:([^%]]+)%]([%[%]])', function(basename, bracket)
-        -- Only compute attach_dir when we know that we need it!
-        if attach_dir == nil then
-          attach_dir = core:get_dir_or_nil(node, true) or false
-        end
-        local res = callback(attach_dir, basename)
-        return res
-            and ('[[%s]%s'):format(res, bracket)
-            or ('[[attachment:%s]%s'):format(basename, bracket)
-      end)
-      if replaced ~= line then
-        vim.api.nvim_buf_set_lines(0, i - 1, i, true, { replaced })
-      end
-      prev_node = node
-    end
-  end, MAX_TIMEOUT)
-end
-
 ---Expand links in current buffer.
 ---
 ---It is meant to be added to `org_export_before_parsing_hook`."
@@ -1007,19 +970,21 @@ function Attach:expand_links(bufnr)
   local file = self.core.files:get(vim.api.nvim_buf_get_name(bufnr))
   local total = 0
   local miss = 0
-  on_every_attachment_link(self.core, file, function(attach_dir, basename)
+  self.core:on_every_attachment_link(file, function(attach_dir, basename)
     total = total + 1
     if not attach_dir then
       miss = miss + 1
       return
     end
     return 'file:' .. vim.fs.joinpath(attach_dir, basename)
-  end)
-  if miss > 0 then
-    utils.echo_warning(('failed to expand %d/%d attachment links'):format(miss, total))
-  else
-    utils.echo_info(('expanded %d attachment links'):format(total))
-  end
+  end):next(function()
+    if miss > 0 then
+      utils.echo_warning(('failed to expand %d/%d attachment links'):format(miss, total))
+    else
+      utils.echo_info(('expanded %d attachment links'):format(total))
+    end
+    return nil
+  end):wait(MAX_TIMEOUT)
 end
 
 return Attach
