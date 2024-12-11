@@ -352,7 +352,7 @@ end
 ---@param cursor [integer, integer] The (1,0)-indexed cursor position in the buffer
 ---@return OrgAttachNode
 function Attach:get_node(file, cursor)
-  return self.core:get_node(file, cursor)
+  return AttachNode.at_cursor(file, cursor)
 end
 
 ---Get attachment node pointed at in a window

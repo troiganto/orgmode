@@ -29,15 +29,6 @@ function AttachCore:get_current_node()
   return AttachNode.at_cursor(self.files:get_current_file())
 end
 
----Get attachment node in a given file at a given position.
----
----@param file OrgFile
----@param cursor [integer, integer] The (1,0)-indexed cursor position in the buffer
----@return OrgAttachNode
-function AttachCore:get_node(file, cursor)
-  return AttachNode.at_cursor(file, cursor)
-end
-
 ---Get an attachment node for an arbitrary window.
 ---
 ---An error occurs if the given window doesn't point at a loaded org file.
@@ -50,6 +41,17 @@ function AttachCore:get_node_by_winid(winid)
   local file = self.files:get(path)
   local cursor = vim.api.nvim_win_get_cursor(winid)
   return AttachNode.at_cursor(file, cursor)
+end
+
+---@param self OrgAttachCore
+---@param bufnr integer
+---@return OrgFile | nil
+local function get_file_by_bufnr(self, bufnr)
+  if not vim.api.nvim_buf_is_loaded(bufnr) then
+    return
+  end
+  local path = vim.api.nvim_buf_get_name(bufnr)
+  return self.files:load_file_sync(path) or nil
 end
 
 ---Get all attachment nodes that are pointed at in a given buffer.
@@ -70,14 +72,8 @@ end
 ---@param bufnr integer
 ---@return OrgAttachNode[]
 function AttachCore:get_nodes_by_buffer(bufnr)
-  if not vim.api.nvim_buf_is_loaded(bufnr) then
-    -- Buffer is not loaded, no lines available.
-    return {}
-  end
-  local path = vim.api.nvim_buf_get_name(bufnr)
-  local file = self.files:load_file_sync(path)
+  local file = get_file_by_bufnr(self, bufnr)
   if not file then
-    -- Buffer is loaded, but not an org file.
     return {}
   end
   local windows = vim.fn.win_findbuf(bufnr)
@@ -107,15 +103,9 @@ end
 ---@param bufnr integer
 ---@return OrgAttachNode|nil
 function AttachCore:get_single_node_by_buffer(bufnr)
-  if not vim.api.nvim_buf_is_loaded(bufnr) then
-    -- Buffer is not loaded, no lines available.
-    return
-  end
-  local path = vim.api.nvim_buf_get_name(bufnr)
-  local file = self.files:load_file_sync(path)
+  local file = get_file_by_bufnr(self, bufnr)
   if not file then
-    -- Buffer is loaded, but not an org file.
-    return
+    return {}
   end
   local windows = vim.fn.win_findbuf(bufnr)
   if #windows == 0 then
@@ -123,20 +113,19 @@ function AttachCore:get_single_node_by_buffer(bufnr)
     local cursor = vim.api.nvim_buf_get_mark(bufnr, '"')
     return AttachNode.at_cursor(file, cursor)
   end
-  -- Org file is active.
-  local node, start_line
+  -- Org file is active. Check that all cursors are on the same node.
+  -- (This is a very cold loop, so it being a bit awkward is acceptable.)
+  local node
   for _, winid in ipairs(windows) do
     local cursor = vim.api.nvim_win_get_cursor(winid)
-    if not node then
-      node = AttachNode.at_cursor(file, cursor)
-    else
-      -- Multiple nodes; continue if they are the same, otherwise break.
-      start_line = start_line or node:get_start_line()
-      local next_node = AttachNode.at_cursor(file, cursor)
-      if start_line ~= next_node:get_start_line() then
-        return
-      end
+    local next_node = AttachNode.at_cursor(file, cursor)
+    -- Because all nodes are in the same buffer, we use the fact that their
+    -- starting-line numbers are unique. This lets us detect when two windows
+    -- point at different nodes.
+    if node and node:get_start_line() ~= next_node:get_start_line() then
+      return
     end
+    node = AttachNode.at_cursor(file, cursor)
   end
   return node
 end
@@ -163,15 +152,13 @@ function AttachCore:list_current_nodes(opts)
     end
     seen_bufs[bufnr] = true
   end
-  local include_hidden = opts and opts.include_hidden or false
-  if include_hidden then
+  if opts and opts.include_hidden or false then
     for _, bufnr in vim.api.nvim_list_bufs() do
-      if vim.api.nvim_buf_is_loaded(bufnr) and not seen_bufs[bufnr] then
-        local path = vim.api.nvim_buf_get_name(bufnr)
-        local file = self.files:load_file_sync(path)
+      if not seen_bufs[bufnr] then
+        local file = get_file_by_bufnr(self, bufnr)
         if file then
-          -- Hidden buffers don't have cursors, only windows do; use the next
-          -- best thing instead, the position when last exited.
+          -- Hidden buffers don't have cursors, only windows do; instead, we
+          -- use the mark where the buffer was last exited.
           local cursor = vim.api.nvim_buf_get_mark(bufnr, '"')
           nodes[#nodes + 1] = AttachNode.at_cursor(file, cursor)
         end
