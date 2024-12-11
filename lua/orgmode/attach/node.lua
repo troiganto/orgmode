@@ -36,21 +36,19 @@ AttachNode.__index = AttachNode
 ---@return OrgAttachNode
 function AttachNode.from_headline(headline)
   ---@type OrgAttachNode
-  local data = {
+  return setmetatable({
     headline = headline,
     file = headline.file,
-  }
-  return setmetatable(data, AttachNode)
+  }, AttachNode)
 end
 
 ---@param file OrgFile
 ---@return OrgAttachNode
 function AttachNode.from_file(file)
   ---@type OrgAttachNode
-  local data = {
+  return setmetatable({
     file = file,
-  }
-  return setmetatable(data, AttachNode)
+  }, AttachNode)
 end
 
 ---@param file OrgFile
@@ -75,10 +73,7 @@ end
 
 ---@return string title
 function AttachNode:get_title()
-  if self.headline then
-    return self.headline:get_title()
-  end
-  return self.file:get_title()
+  return (self.headline or self.file):get_title()
 end
 
 ---Return the starting line of the attachment node.
@@ -101,33 +96,24 @@ function AttachNode:get_property(property_name, search_parents)
   if search_parents == nil then
     search_parents = config:use_attach_inheritance(property_name)
   end
-  local property
-  if self.headline then
-    property = self.headline:get_property(property_name, search_parents)
-    if property or not search_parents then
-      return property
-    end
+  if search_parents then
+    return self.headline
+        and self.headline:get_property(property_name, true)
+        or self.file:get_property(property_name)
   end
-  property = self.file:get_property(property_name)
-  return property
+  return (self.headline or self.file):get_property(property_name, false)
 end
 
 ---@param name string property name
 ---@param value? string property value
 ---@return nil
 function AttachNode:set_property(name, value)
-  if self.headline then
-    self.headline:set_property(name, value)
-  else
-    self.file:set_property(name, value)
-  end
+  (self.headline or self.file):set_property(name, value)
 end
 
 ---@return string id
 function AttachNode:id_get_or_create()
-  return self.headline
-      and self.headline:id_get_or_create()
-      or self.file:id_get_or_create()
+  return (self.headline or self.file):id_get_or_create()
 end
 
 ---Find the attachment directory associated with this node.
