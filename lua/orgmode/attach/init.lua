@@ -728,8 +728,8 @@ end
 
 ---@class orgmode.attach.attach_new.Options
 ---@inlinedoc
----@field bang? boolean if true, open the new file with `:enew!`
----@field mods? table<string,any> command modifiers to pass to `:enew[!]`; see
+---@field bang? boolean if true, open the new file with `:edit!`
+---@field mods? table<string,any> command modifiers to pass to `:edit[!]`; see
 ---                               docs for `nvim_parse_cmd()` for a list
 
 ---Create a new attachment FILE for the current outline node.
@@ -738,9 +738,9 @@ end
 ---
 ---@param name? string
 ---@param node? OrgAttachNode
----@param enew_opts? orgmode.attach.attach_new.Options
+---@param edit_opts? orgmode.attach.attach_new.Options
 ---@return string|nil attachment_name
-function Attach:attach_new(name, node, enew_opts)
+function Attach:attach_new(name, node, edit_opts)
   name = name or vim.fn.input('Create attachnment named: ')
   if not name or name == '' then
     error('Cancelled')
@@ -749,8 +749,8 @@ function Attach:attach_new(name, node, enew_opts)
   return self.core:attach_new(node, name, {
     set_dir_method = get_set_dir_method(),
     new_dir = get_new_dir_prop,
-    enew_bang = enew_opts and enew_opts.bang or false,
-    enew_mods = enew_opts and enew_opts.mods or {},
+    edit_bang = edit_opts and edit_opts.bang or false,
+    edit_mods = edit_opts and edit_opts.mods or {},
   }):next(function(attachment_name)
     if attachment_name then
       utils.echo_info(('new attachment %s'):format(attachment_name))

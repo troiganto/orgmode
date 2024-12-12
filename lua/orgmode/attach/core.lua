@@ -185,7 +185,7 @@ end
 ---@return string|nil attach_dir
 function AttachCore:get_dir_or_nil(node, no_fs_check)
   local dir = node:get_dir()
-  return dir and (no_fs_check or vim.fs.is_dir(dir)) and dir or nil
+  return dir and (no_fs_check or fileops.is_dir(dir)) and dir or nil
 end
 
 ---Return the directory associated with the current outline node.
@@ -428,16 +428,17 @@ function AttachCore:attach_buffer(node, bufnr, opts)
     if not success then
       return nil
     end
-    return fileops.exists(bufname):next(function(bufname_exists)
-      EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
-      node:toggle_auto_tag(true)
-      local link = self.links:store_link_to_attachment({
-        attach_dir = attach_dir,
-        original = bufname_exists and bufname or attach_file,
-      })
-      vim.fn.setreg(vim.v.register, link)
-      return basename
-    end)
+    -- Ignore all errors here, this is just to determine whether we can store
+    -- a link to `bufname`.
+    local bufname_exists = vim.uv.fs_stat(bufname)
+    EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
+    node:toggle_auto_tag(true)
+    local link = self.links:store_link_to_attachment({
+      attach_dir = attach_dir,
+      original = ok and bufname_exists and bufname or attach_file,
+    })
+    vim.fn.setreg(vim.v.register, link)
+    return basename
   end)
 end
 
@@ -490,12 +491,13 @@ end
 ---@inlinedoc
 ---@field set_dir_method orgmode.attach.core.new_method | fun(): orgmode.attach.core.new_method
 ---@field new_dir string | fun(): string
----@field enew_bang boolean
----@field enew_mods table<string,any>
+---@field edit_bang boolean
+---@field edit_mods table<string,any>
 
 ---Create a new attachment FILE for the current outline node.
 ---
----The attachment is opened as a new buffer.
+---The attachment is opened via `:edit`. The command can be modified via
+---`opts`.
 ---
 ---@param node OrgAttachNode
 ---@param name string
@@ -507,13 +509,10 @@ function AttachCore:attach_new(node, name, opts)
   --TODO: the emacs version doesn't run the hook here. Is this correct?
   EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
   node:toggle_auto_tag(true)
-  return fileops.exists(path):next(function(already_exists)
-    if already_exists then
-      return Promise.reject('EEXIST: ' .. path)
-    end
-    ---@type vim.api.keyset.cmd
-    local cmd = { cmd = 'enew', args = { path }, bang = opts.enew_bang, mods = opts.enew_mods }
-    return Promise.new(function(resolve, reject)
+  ---@type vim.api.keyset.cmd
+  return Promise.new(function(resolve, reject)
+    local cmd = { cmd = 'edit', args = { path }, bang = opts.edit_bang, mods = opts.edit_mods }
+    vim.schedule(function()
       local ok, err = pcall(vim.api.nvim_cmd, cmd, {})
       if ok then
         resolve(name)

@@ -92,11 +92,11 @@ function M.get_existing_from_id(id)
     local name = M.translate(func, id)
     if name then
       local candidate = vim.fs.joinpath(basedir, name)
-      if fileops.is_dir(candidate):wait() then
+      if fileops.is_dir(candidate) then
         return candidate
       end
       local fallback = vim.fs.joinpath(default_basedir, name)
-      if fileops.is_dir(fallback):wait() then
+      if fileops.is_dir(fallback) then
         return fallback
       end
     end

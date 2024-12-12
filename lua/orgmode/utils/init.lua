@@ -53,9 +53,14 @@ function utils.readfile(file, opts)
   end)
 end
 
-function utils.writefile(file, data)
+---@param file string
+---@param data string|string[]
+---@param opts? {excl?: boolean}
+---@return OrgPromise<integer> bytes
+function utils.writefile(file, data, opts)
   return Promise.new(function(resolve, reject)
-    uv.fs_open(file, 'w', 438, function(err1, fd)
+    local flags = opts and opts.excl and 'wx' or 'w'
+    uv.fs_open(file, flags, 438, function(err1, fd)
       if err1 then
         return reject(err1)
       end

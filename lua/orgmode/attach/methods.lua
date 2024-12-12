@@ -1,6 +1,7 @@
 local Promise = require('orgmode.utils.promise')
 local config = require('orgmode.config')
 local fileops = require('orgmode.attach.fileops')
+local utils = require('orgmode.utils')
 
 local M = {}
 
@@ -10,16 +11,15 @@ local FILE_ATTACHERS = {
     return fileops.rename(source, target)
   end,
   cp = function(source, target)
-    return fileops.is_dir(source):next(function(is_dir)
-      if is_dir then
-        return fileops.copy_directory(source, target, {
-          parents = false,
-          keep_times = false,
-          create_symlink = config.org_attach_copy_directory_create_symlink,
-        })
-      end
+    if fileops.is_dir(source) then
+      return fileops.copy_directory(source, target, {
+        parents = false,
+        keep_times = false,
+        create_symlink = config.org_attach_copy_directory_create_symlink,
+      })
+    else
       return fileops.copy_file(source, target, { excl = true, ficlone = true, ficlone_force = false })
-    end)
+    end
   end,
   ln = function(source, target)
     return fileops.hardlink(source, target)
@@ -55,23 +55,10 @@ end
 ---@param target string
 ---@return OrgPromise<boolean> success
 function M.attach_buffer(bufnr, target)
-  return fileops.exists(target)
-      :next(function(exists)
-        if exists then
-          return Promise.reject('EEXIST: ' .. target)
-        end
-        return nil
-      end)
+  local data = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
+  return utils.writefile(target, data, { excl = true })
       :next(function()
-        local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-        return Promise.new(function(resolve, reject)
-          local ok, res = pcall(vim.fn.writefile, lines, target, 's')
-          if ok then
-            resolve(res == 0)
-          else
-            reject(res)
-          end
-        end)
+        return true
       end)
 end
 
