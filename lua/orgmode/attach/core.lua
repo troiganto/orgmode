@@ -1,4 +1,5 @@
 local AttachNode = require('orgmode.attach.node')
+local EventManager = require('orgmode.events')
 local Promise = require('orgmode.utils.promise')
 local config = require('orgmode.config')
 local fileops = require('orgmode.attach.fileops')
@@ -428,6 +429,7 @@ function AttachCore:attach(node, file, opts)
       if not success then
         return nil
       end
+      EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
       node:add_auto_tag()
       local link = self.links:store_link_to_attachment({ attach_dir = attach_dir, original = file })
       vim.fn.setreg(vim.v.register, link)
@@ -456,6 +458,7 @@ function AttachCore:attach_buffer(node, bufnr, opts)
     local attach_file = vim.fs.joinpath(attach_dir, basename)
     local data = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n')
     return utils.writefile(attach_file, data, { excl = true }):next(function()
+      EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
       node:add_auto_tag()
       -- Ignore all errors here, this is just to determine whether we can store
       -- a link to `bufname`.
@@ -499,6 +502,7 @@ function AttachCore:attach_many(node, files, opts)
       end, files)
       ---@param successes boolean[]
       :next(function(successes)
+        EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
         node:add_auto_tag()
         ---@param tally orgmode.attach.core.attach_many.result
         ---@param success boolean
@@ -539,6 +543,7 @@ function AttachCore:attach_new(node, name, opts)
   return self:get_dir_or_create(node, opts.set_dir_method, opts.new_dir):next(function(attach_dir)
     local path = vim.fs.joinpath(attach_dir, name)
     --TODO: the emacs version doesn't run the hook here. Is this correct?
+    EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
     node:add_auto_tag()
     ---@type vim.api.keyset.cmd
     return Promise.new(function(resolve, reject)
@@ -584,6 +589,7 @@ end
 function AttachCore:open(name, node)
   local attach_dir = self:get_dir(node)
   local path = vim.fs.joinpath(attach_dir, name)
+  EventManager.dispatch(EventManager.event.AttachOpened:new(node, path))
   return assert(vim.ui.open(path))
 end
 
@@ -595,6 +601,7 @@ end
 function AttachCore:open_in_vim(name, node)
   local attach_dir = self:get_dir(node)
   local path = vim.fs.joinpath(attach_dir, name)
+  EventManager.dispatch(EventManager.event.AttachOpened:new(node, path))
   vim.cmd.edit(path)
 end
 
@@ -611,6 +618,7 @@ function AttachCore:delete_one(node, name)
   local attach_dir = self:get_dir(node)
   local path = vim.fs.joinpath(attach_dir, name)
   return fileops.unlink(path):next(function()
+    EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
     return nil
   end)
 end
@@ -645,6 +653,7 @@ function AttachCore:delete_all(node, recursive)
       return Promise.reject(errmsg)
     end
     return fileops.remove_directory(attach_dir, { recursive = true }):next(function()
+      EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
       node:remove_auto_tag()
       return attach_dir
     end)
@@ -679,6 +688,7 @@ function AttachCore:sync(node, delete_empty_dir)
     self:untag(node)
     return Promise.resolve()
   end
+  EventManager.dispatch(EventManager.event.AttachChanged:new(node, attach_dir))
   local non_empty = has_any_non_litter_files(attach_dir)
   if non_empty then
     node:add_auto_tag()
